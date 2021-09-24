@@ -1,0 +1,158 @@
+---
+title: "Лабораторная работа 1, вариант 13"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r load-packages, include=FALSE}
+library(rmutil)
+
+```
+
+
+1. Объем выборки $N = 1000$
+2. Зададим параметры
+```{r}
+
+N = 1000
+p = 0.5
+laplas_a = 1.8
+u = 4.7
+normal_a = 0
+sd = 2
+```
+3. Функция распределения смеси Лапласа и Нормального:
+$$\begin{equation}F(x) = \frac{1}{2}F_1(x) +  \frac{1}{2}F_2(x) = 
+    \begin{cases}
+      \frac{1}{4}e^{\frac{x-a}{u}} + \frac{1}{4}\left[1 +erf\left(\frac{x}{2 \sqrt{2}}\right)\right] \qquad x \leq a \\
+       \frac{1}{2} - \frac{1}{4}e^{- \frac{x-a}{u}} + \frac{1}{4}\left[1 +erf\left(\frac{x}{2 \sqrt{2}}\right)\right] \qquad x > a
+    \end{cases}\,.
+\end{equation}$$
+
+Плотность смеси:
+$$\begin{equation}f(x) = \frac{1}{2}f_1(x) +  \frac{1}{2}f_2(x) = 
+    \begin{cases}
+      \frac{1}{4u}e^{\frac{x-a}{u}} + \frac{1}{4 \sqrt{2\pi}} e^\frac{-x^2}{8} \qquad x \leq a \\
+       \frac{1}{4u}e^{- \frac{x-a}{u}} + \frac{1}{4 \sqrt{2\pi}} e^\frac{-x^2}{8} \qquad x > a
+    \end{cases}\,.
+\end{equation}$$
+
+Математическое ожидание смеси:
+$$E = \frac{1}{2}E_1 +  \frac{1}{2}E_2 = \frac{1}{2}a +  \frac{1}{2}0 = \frac{a}{2} = 0.9  $$
+
+
+$$E_{1z^2} = \int_{- \infty}^{\infty}z^2\frac{1}{2u}e^{\frac{|z-a|}{u}}dz = \int_{- \infty}^{a}z^2\frac{1}{2u}e^{\frac{z-a}{u}}dz + \int_{a}^{\infty}z^2\frac{1}{2u}e^{-\frac{z-a}{u}}dz =$$
+$$= \left(\frac{a^2}{2}-au+ u^2\right) + \left(\frac{a^2}{2} +au+ u^2\right) = a^2 + 2u^2 $$
+Дисперсия смеси:
+$$D = E_{z^2} - E_z^2 = \frac{1}{2}(E_{1z^2} + E_{2z^2}) - \frac{a^2}{4} = \frac{1}{2}(a^2 + 2u^2  + 4) - \frac{a^2}{4}  = u^2 + \frac{a^2}{4} + 2 = 24.9$$
+
+
+
+4. Пусть требуется смоделировать и обработать выборку $X = (X_1 . . . , X_N )$ объема
+N = 1000 независимых случайных величин, имеющих распределение Лапласа с
+параметрами $a = 1.8$ и $u = 4.7$. Моделирующая формула для распределения Лапласа имеет
+вид:
+$$\begin{equation}L(t) = 
+    \begin{cases}
+      uln(2t) + a \qquad t \leq \frac{1}{2} \\
+       -u ln(2 - 2t) + a \qquad t > \frac{1}{2} 
+    \end{cases}\,.
+\end{equation}$$
+
+
+
+
+Преобразование Смирнова:
+```{r}
+U = runif(N)
+L_1 = u*log(2*U[U <= 1/2]) + laplas_a
+L_2 = -u*log(2 - 2*U[U > 1/2]) + laplas_a
+L = c(L_1, L_2)
+```
+Построим смесь:
+
+```{r}
+N_sample = rnorm(N,normal_a,sd)
+random_vector = sample(0:1,N,TRUE)
+mix = L*random_vector + N_sample*abs(random_vector -1)
+```
+
+
+
+5.Построим графики эмперической и теоретической функции распределения
+```{r}
+x = seq(-30,30,0.1)
+plot(x, 0.5*pnorm(x, mean = 0, sd = sd) + 0.5*plaplace(x, 1.8, 4.7), type="l", col="Deep Sky Blue", lwd=5)
+lines(ecdf(mix), col="Dark red", lwd=2)
+```
+6. Построим графики теоретической плотности распределения и гистограмму
+```{r}
+x = seq(-20,20,0.1)
+
+h = hist(mix, breaks = round(1.72*(N ** (1/3))), plot=FALSE)
+h$counts=h$counts/sum(h$counts)
+plot(h)
+lines(x, 0.5*dnorm(x,mean=0, sd = sd ) + 0.5*dlaplace(x, 1.8, 4.7), type="l", col="Deep Sky Blue", lwd=5)
+```
+
+7. Сравнить статистические оценки математического ожидания и дисперсии
+с их теоретическими значениями.
+```{r}
+mean_mix = mean(mix) 
+var_mix = var(mix)
+cat("error_mean_mix = ",abs(mean_mix - 0.9), "\n")
+cat("error_var_mix = ",abs(var_mix - 24.9))
+```
+8.Построить асимптотические доверительные интервалы
+
+```{r}
+cat("Истинное мат. ожидание = 0.9 \nИстинная дисперсия = 24.9\n\n")
+alpha = 0.01
+for (alpha in c(0.1, 0.05, 0.0025)) {
+  
+
+half_mean = qnorm(1 - alpha/2)*(sd(mix))/sqrt(N)
+mean_interval = c(mean_mix - half_mean, mean_mix + half_mean)
+
+moment_2 = sum((mix - mean_mix) ** 2) / N
+moment_4 = sum((mix - mean_mix) ** 4) / N
+
+half_var = qnorm(1 - alpha/2) * (((moment_4 - moment_2 ** 2)/N) ** (0.5))
+var_interval = c(var_mix - half_var, var_mix + half_var)
+
+
+cat(mean_interval, " - доверительный интервал для м.о с уровнем значимости ", alpha, "\n")
+cat(var_interval, " - доверительный интервал для дисперсии с уровнем значимости ", alpha, "\n\n")
+}
+
+```
+9. Параметры асимметрии и эксцесса
+
+```{r}
+moment_3 = sum((mix - mean_mix) ** 3) / N
+B = moment_3/((var_mix) ** (3/2))
+E = moment_4/(var_mix ** 2)
+cat(B, "\n", E)
+```
+
+10. Найти для своего распределения теоретические медиану и квантили уровней 0.25 и
+0.75. 
+```{r}
+get_analysis <- function(X, name,x_text,y_text) {
+  quant = quantile(X,  probs = c(0.25, 0.5, 0.75))
+  hist(X, prob = TRUE, col="peachpuff", border="black", main = name)
+  lines(density(X))
+  abline(v = quant, col="blue", lwd=c(4),  lty=c(2,2,2))
+  text(x = (quant + x_text), y = y_text, label = c("0,25-квантиль","","0,75-квантиль"), srt = 90)
+  return(summary(X))
+}
+
+get_analysis(mix, "norm", -1, 0.04 )
+
+
+```
+
+
+

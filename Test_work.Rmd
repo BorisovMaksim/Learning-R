@@ -1,0 +1,100 @@
+---
+title: "test"
+author: "Borisov Maksim"
+date: "9/15/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr) 
+```
+
+
+```{r}
+df <- read.csv("/home/maksim/Downloads/forFBpost.csv", sep = ";")
+head(df)
+```
+
+```{r}
+summary(df)
+```
+```{r}
+fact_not_na = df %>% 
+  filter(!is.na(fact)) %>%
+  mutate(
+    diff_min = abs(Модель - fact),
+    diff_max = abs(Модель - fact),
+    diff_average = abs(Модель - fact)/fact
+  )
+fact_na = df %>% 
+  filter(is.na(fact)) %>%
+ mutate(
+    diff_min = abs(Модель - Нижняя.граница),
+    diff_max = abs(Модель - Верхняя.граница),
+    diff_average = abs(Модель - (Верхняя.граница + Нижняя.граница)/2)/Верхняя.граница 
+  )
+
+df_updated = bind_rows(fact_not_na,fact_na)
+
+```
+
+Фактически, нам известна численность за 2008 - 2020 года
+```{r}
+fact_not_na %>% select(year) %>% unique()
+```
+
+
+Максимальная ошибка 50 %
+```{r}
+summary(df_updated$diff_average)
+```
+
+Почти все предсказания допускают ошибку не более 2 %
+```{r}
+hist(df_updated$diff_average, xlim=c(0,0.05),  breaks=200)
+```
+
+
+
+```{r}
+df_year = df_updated %>%
+  group_by(year) %>%
+  summarise(diff_min = mean(diff_min), 
+            diff_max = mean(diff_max),
+            diff_average =mean(diff_average))
+
+```
+
+
+
+
+Видим, что на фактических данных ошибка небольшая, но выбивается из тенденции 
+```{r}
+df_year %>% 
+  with(plot(year, diff_average))
+```
+
+
+```{r}
+df_town = df_updated %>%
+  group_by(Город) %>%
+  summarise(diff_min = mean(diff_min), 
+            diff_max = mean(diff_max),
+            diff_average =mean(diff_average))
+
+```
+
+```{r}
+hist(df_town$diff_average, xlim=c(0,0.3),  breaks=100)
+```
+
+Систематическая ошибка более 2 % только в маленьких городах
+```{r}
+df_town %>% 
+  filter(diff_average > 0.02) %>%
+  select(Город)
+```
+
+
+
